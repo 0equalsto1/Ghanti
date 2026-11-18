@@ -1,0 +1,20 @@
+# Keystore / Secrets
+*.jks
+*.keystore
+keystore/
+
+# Gradle & Build outputs
+.gradle/
+build/
+app/build/
+*.apk
+*.aab
+
+# IDE & Editor
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

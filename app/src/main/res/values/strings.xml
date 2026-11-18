@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">OmniClock</string>
+    <string name="tab_world_clock">World Clock</string>
+    <string name="tab_alarms">Alarms</string>
+    <string name="add_alarm">Add Alarm</string>
+    <string name="snooze_5m">5 Min</string>
+    <string name="snooze_10m">10 Min</string>
+    <string name="snooze_15m">15 Min</string>
+    <string name="snooze_custom">Custom</string>
+    <string name="dismiss">Dismiss</string>
+</resources>

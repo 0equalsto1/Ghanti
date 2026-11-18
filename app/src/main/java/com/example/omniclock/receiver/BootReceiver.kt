@@ -1,0 +1,21 @@
+package com.example.omniclock.receiver
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import com.example.omniclock.data.repository.AlarmRepository
+
+class BootReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
+            intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED"
+        ) {
+            val repository = AlarmRepository(context)
+            // Re-schedule all enabled alarms after device reboot
+            repository.alarms.value.filter { it.isEnabled }.forEach { alarm ->
+                repository.addOrUpdateAlarm(alarm)
+            }
+        }
+    }
+}

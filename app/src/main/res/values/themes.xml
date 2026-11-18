@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.OmniClock" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.OmniClock.Fullscreen" parent="Theme.OmniClock">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowShowWallpaper">true</item>
+    </style>
+</resources>

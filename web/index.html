@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OmniClock — World Clock & Event Alarms</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon-192.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.18); opacity: 0.35; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-ring { animation: pulse-ring 1.5s infinite ease-in-out; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-0 sm:p-4 font-sans selection:bg-cyan-500 selection:text-black">
+
+  <!-- Main Mobile Frame Container -->
+  <div class="relative w-full max-w-md h-screen sm:h-[840px] bg-slate-900 sm:rounded-[44px] sm:border-4 sm:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+    
+    <!-- Top System & Status Header -->
+    <header class="pt-3 px-5 pb-3 bg-slate-900/95 backdrop-blur border-b border-slate-800/80 flex justify-between items-center z-10">
+      <div class="flex items-center space-x-2">
+        <img src="./icons/icon-192.svg" class="w-6 h-6 rounded-lg" alt="OmniClock">
+        <span class="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">OmniClock</span>
+      </div>
+      <div class="flex items-center space-x-2">
+        <!-- Install PWA Button (Visible if browser supports PWA install) -->
+        <button id="pwaInstallBtn" class="hidden text-xs bg-cyan-500 text-slate-950 font-bold px-2.5 py-1 rounded-full shadow hover:bg-cyan-400 transition flex items-center gap-1">
+          <i class="fa-solid fa-download text-[10px]"></i>
+          <span>Install</span>
+        </button>
+        <!-- Test Ring Trigger -->
+        <button onclick="triggerTestRing()" class="text-xs bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 px-3 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-bell text-xs"></i>
+          <span>Test Ring</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scrollable Main View Area -->
+    <main class="flex-1 overflow-y-auto px-4 py-3 pb-24" id="mainContainer">
+      
+      <!-- TAB 1: WORLD CLOCK -->
+      <section id="worldClockTab" class="space-y-4">
+        <!-- Hero Local Time Card -->
+        <div class="p-5 rounded-3xl bg-gradient-to-br from-cyan-950/70 to-slate-800/90 border border-cyan-500/30 shadow-lg text-center relative overflow-hidden">
+          <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl"></div>
+          <p class="text-xs font-semibold text-cyan-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-location-dot"></i> <span id="localZoneName">Local Time</span>
+          </p>
+          <h1 id="heroLocalTime" class="text-4xl sm:text-5xl font-black tracking-tight text-white my-1 font-mono">00:00:00</h1>
+          <p id="heroLocalDate" class="text-xs text-slate-300 font-medium">Loading local date...</p>
+        </div>
+
+        <!-- Search Cities -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+          <input type="text" id="citySearchInput" oninput="filterCities()" placeholder="Search major countries or cities..." 
+                 class="w-full bg-slate-800/80 border border-slate-700/80 rounded-2xl pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 transition">
+        </div>
+
+        <!-- City Cards List -->
+        <div id="citiesList" class="space-y-2.5">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 2: EVENT ALARMS -->
+      <section id="alarmsTab" class="space-y-3 hidden">
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="text-sm font-semibold text-slate-300">Your Scheduled Alarms</h2>
+          <span class="text-xs text-cyan-400 font-medium" id="alarmCountBadge">3 Active</span>
+        </div>
+
+        <div id="alarmsList" class="space-y-3">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="absolute bottom-0 left-0 right-0 h-20 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex justify-around items-center px-6 z-20">
+      <button onclick="switchTab('world')" id="tabWorldBtn" class="flex flex-col items-center text-cyan-400 transition">
+        <i class="fa-solid fa-earth-americas text-lg"></i>
+        <span class="text-[11px] font-semibold mt-1">World Clock</span>
+      </button>
+
+      <!-- Floating Action Button: Add Alarm -->
+      <button onclick="openAddAlarmModal()" class="w-13 h-13 -mt-6 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-full shadow-lg shadow-cyan-500/30 flex items-center justify-center text-slate-950 font-bold hover:scale-105 active:scale-95 transition">
+        <i class="fa-solid fa-plus text-lg"></i>
+      </button>
+
+      <button onclick="switchTab('alarms')" id="tabAlarmsBtn" class="flex flex-col items-center text-slate-400 hover:text-slate-200 transition">
+        <i class="fa-regular fa-clock text-lg"></i>
+        <span class="text-[11px] font-semibold mt-1">Alarms</span>
+      </button>
+    </nav>
+
+    <!-- ================= ADD / EDIT ALARM MODAL ================= -->
+    <div id="addAlarmModal" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col justify-end transition-opacity duration-300 hidden">
+      <div class="bg-slate-900 border-t border-slate-800 rounded-t-[36px] p-5 max-h-[90%] overflow-y-auto space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <span class="text-cyan-400">⏰</span> Set Event Alarm
+          </h3>
+          <button onclick="closeAddAlarmModal()" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+            <i class="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </div>
+
+        <!-- Time Picker (Hour & Minute Selector) -->
+        <div class="flex justify-center items-center gap-4 py-3 bg-slate-800/50 rounded-2xl border border-slate-700/50">
+          <div class="flex flex-col items-center">
+            <button onclick="adjustHour(1)" class="text-slate-400 hover:text-white text-xs py-1">▲</button>
+            <span id="pickHour" class="text-4xl font-extrabold text-cyan-400 font-mono">07</span>
+            <button onclick="adjustHour(-1)" class="text-slate-400 hover:text-white text-xs py-1">▼</button>
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider">Hour</span>
+          </div>
+          <span class="text-3xl font-bold text-slate-500 -mt-3">:</span>
+          <div class="flex flex-col items-center">
+            <button onclick="adjustMinute(1)" class="text-slate-400 hover:text-white text-xs py-1">▲</button>
+            <span id="pickMinute" class="text-4xl font-extrabold text-cyan-400 font-mono">30</span>
+            <button onclick="adjustMinute(-1)" class="text-slate-400 hover:text-white text-xs py-1">▼</button>
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider">Min</span>
+          </div>
+          <div class="flex flex-col gap-1.5 ml-2">
+            <button id="ampmAM" onclick="setAmPm('AM')" class="text-xs px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-bold">AM</button>
+            <button id="ampmPM" onclick="setAmPm('PM')" class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400">PM</button>
+          </div>
+        </div>
+
+        <!-- Event Type Category Selector -->
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1.5">Event Category</label>
+          <div class="flex flex-wrap gap-1.5" id="eventTypeChips">
+            <!-- Chips generated by JS -->
+          </div>
+        </div>
+
+        <!-- Event Label -->
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1.5">Event Name / Memo</label>
+          <input type="text" id="alarmLabelInput" placeholder="e.g. Mom's Birthday, Team Standup"
+                 class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <!-- Recurrence Presets -->
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1.5">Repeat Schedule</label>
+          <div class="grid grid-cols-2 gap-2" id="presetButtons">
+            <button type="button" onclick="selectPreset('EVERY_DAY')" data-preset="EVERY_DAY" class="preset-btn text-xs py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/80 font-medium hover:border-cyan-500 transition">Every Day</button>
+            <button type="button" onclick="selectPreset('WEEKDAYS')" data-preset="WEEKDAYS" class="preset-btn text-xs py-2 px-3 rounded-xl border border-cyan-500 bg-cyan-950/60 text-cyan-300 font-medium">Weekdays (M-F)</button>
+            <button type="button" onclick="selectPreset('WHOLE_WEEK')" data-preset="WHOLE_WEEK" class="preset-btn text-xs py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/80 font-medium hover:border-cyan-500 transition">Whole Week</button>
+            <button type="button" onclick="selectPreset('SPECIFIC_DATES')" data-preset="SPECIFIC_DATES" class="preset-btn text-xs py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/80 font-medium hover:border-cyan-500 transition">Specific Date(s)</button>
+          </div>
+        </div>
+
+        <!-- Multi-Date Picker (Visible when Specific Date(s) is selected) -->
+        <div id="multiDateSection" class="p-3 bg-slate-800/40 rounded-2xl border border-slate-700/60 space-y-2 hidden">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-semibold text-cyan-400">Select Multiple Dates</span>
+            <span id="selectedDatesCount" class="text-[11px] text-slate-400">0 selected</span>
+          </div>
+          <!-- Next 14 days quick selector -->
+          <div class="flex space-x-1.5 overflow-x-auto py-1" id="multiDateDaysRow">
+            <!-- Populated dynamically -->
+          </div>
+          <div id="selectedDatePills" class="flex flex-wrap gap-1 pt-1">
+            <!-- Selected Pills -->
+          </div>
+        </div>
+
+        <button onclick="saveNewAlarm()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold py-3 rounded-2xl shadow-lg shadow-cyan-500/20 active:scale-98 transition text-sm">
+          Save Alarm
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= FULLSCREEN ALARM RING & SNOOZE SCREEN ================= -->
+    <div id="alarmRingOverlay" class="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-cyan-950 z-50 flex flex-col justify-between p-6 hidden">
+      
+      <!-- Top Event Header -->
+      <div class="text-center pt-8">
+        <span id="ringEmoji" class="text-6xl inline-block mb-3">🎂</span>
+        <h2 id="ringTitle" class="text-2xl font-black text-white">Mom's Birthday!</h2>
+        <p class="text-xs text-cyan-400 uppercase tracking-widest mt-1 font-semibold">Alarm Alert</p>
+        <p id="ringCurrentTime" class="text-5xl font-mono font-black text-cyan-300 mt-4">07:30 AM</p>
+      </div>
+
+      <!-- Pulsing Bell Graphics -->
+      <div class="flex justify-center items-center my-auto">
+        <div class="relative flex items-center justify-center">
+          <div class="w-36 h-36 rounded-full bg-cyan-400/20 pulse-ring absolute"></div>
+          <div class="w-24 h-24 rounded-full bg-cyan-500 flex items-center justify-center text-slate-950 text-4xl shadow-xl shadow-cyan-400/50">
+            <i class="fa-solid fa-bell"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Snooze Options (5, 10, 15, Custom) + Dismiss -->
+      <div class="space-y-4 pb-4">
+        <div>
+          <p class="text-xs font-semibold text-slate-400 text-center mb-2.5 uppercase tracking-wider">Snooze Duration</p>
+          <div class="grid grid-cols-4 gap-2">
+            <button onclick="performSnooze(5)" class="py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-xs transition">
+              5 Min
+            </button>
+            <button onclick="performSnooze(10)" class="py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-xs transition">
+              10 Min
+            </button>
+            <button onclick="performSnooze(15)" class="py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold text-xs transition">
+              15 Min
+            </button>
+            <button onclick="openCustomSnoozeDialog()" class="py-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 font-bold text-xs transition">
+              Custom
+            </button>
+          </div>
+        </div>
+
+        <button onclick="dismissAlarm()" class="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm tracking-wide shadow-lg shadow-rose-600/30 active:scale-98 transition">
+          DISMISS ALARM
+        </button>
+      </div>
+
+      <!-- Custom Snooze Picker Modal Inside Ring Overlay -->
+      <div id="customSnoozeModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 hidden">
+        <div class="w-full max-w-xs bg-slate-900 border border-slate-700 rounded-3xl p-5 text-center space-y-4">
+          <h4 class="text-base font-bold text-white">Custom Snooze</h4>
+          <div class="text-4xl font-extrabold text-cyan-400 font-mono" id="customSnoozeValue">20m</div>
+          <input type="range" min="1" max="60" value="20" id="customSnoozeSlider" 
+                 oninput="document.getElementById('customSnoozeValue').innerText = this.value + 'm'"
+                 class="w-full accent-cyan-400">
+          <div class="flex justify-between text-[10px] text-slate-400">
+            <span>1m</span><span>30m</span><span>60m</span>
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button onclick="document.getElementById('customSnoozeModal').classList.add('hidden')" class="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Cancel</button>
+            <button onclick="confirmCustomSnooze()" class="flex-1 py-2 rounded-xl bg-cyan-500 text-slate-950 text-xs font-bold">Apply</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="absolute top-12 left-4 right-4 bg-slate-800/95 border border-cyan-500/50 text-slate-100 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50 transition-all duration-300 transform -translate-y-24 opacity-0 pointer-events-none">
+      <i class="fa-solid fa-circle-check text-cyan-400 text-base"></i>
+      <span id="toastMsg" class="text-xs font-medium">Alarm action confirmed</span>
+    </div>
+
+  </div>
+
+  <!-- Interactive Logic Script -->
+  <script>
+    // --- Register Service Worker for PWA ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    // --- PWA Installation Event Handler ---
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('pwaInstallBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.remove('hidden');
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          installBtn.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      }
+    });
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      setTimeout(() => {
+        Notification.requestPermission();
+      }, 3000);
+    }
+
+    // --- Data Models ---
+    const CITIES = [
+      { id: "tokyo", name: "Tokyo", country: "Japan", flag: "🇯🇵", tz: "Asia/Tokyo", isPinned: true },
+      { id: "london", name: "London", country: "United Kingdom", flag: "🇬🇧", tz: "Europe/London", isPinned: true },
+      { id: "newyork", name: "New York", country: "United States", flag: "🇺🇸", tz: "America/New_York", isPinned: true },
+      { id: "sanfrancisco", name: "San Francisco", country: "United States", flag: "🇺🇸", tz: "America/Los_Angeles", isPinned: false },
+      { id: "dubai", name: "Dubai", country: "United Arab Emirates", flag: "🇦🇪", tz: "Asia/Dubai", isPinned: true },
+      { id: "paris", name: "Paris", country: "France", flag: "🇫🇷", tz: "Europe/Paris", isPinned: true },
+      { id: "mumbai", name: "New Delhi / Mumbai", country: "India", flag: "🇮🇳", tz: "Asia/Kolkata", isPinned: true },
+      { id: "singapore", name: "Singapore", country: "Singapore", flag: "🇸🇬", tz: "Asia/Singapore", isPinned: true },
+      { id: "sydney", name: "Sydney", country: "Australia", flag: "🇦🇺", tz: "Australia/Sydney", isPinned: false },
+      { id: "toronto", name: "Toronto", country: "Canada", flag: "🇨🇦", tz: "America/Toronto", isPinned: false },
+      { id: "berlin", name: "Berlin", country: "Germany", flag: "🇩🇪", tz: "Europe/Berlin", isPinned: false },
+      { id: "cairo", name: "Cairo", country: "Egypt", flag: "🇪🇬", tz: "Africa/Cairo", isPinned: false },
+      { id: "seoul", name: "Seoul", country: "South Korea", flag: "🇰🇷", tz: "Asia/Seoul", isPinned: false },
+      { id: "saopaulo", name: "São Paulo", country: "Brazil", flag: "🇧🇷", tz: "America/Sao_Paulo", isPinned: false }
+    ];
+
+    const EVENT_TYPES = [
+      { id: "GENERAL", title: "General", emoji: "⏰" },
+      { id: "BIRTHDAY", title: "Birthday", emoji: "🎂" },
+      { id: "ANNIVERSARY", title: "Anniversary", emoji: "💍" },
+      { id: "MEETING", title: "Meeting", emoji: "📅" },
+      { id: "MEDICINE", title: "Medicine", emoji: "💊" },
+      { id: "WORKOUT", title: "Workout", emoji: "⚡" },
+      { id: "CUSTOM", title: "Custom", emoji: "✨" }
+    ];
+
+    // Load alarms from localStorage or defaults
+    const savedAlarms = localStorage.getItem('omniclock_alarms');
+    let alarms = savedAlarms ? JSON.parse(savedAlarms) : [
+      {
+        id: "1",
+        hour: 7,
+        minute: 0,
+        ampm: "AM",
+        label: "Morning Wake Up",
+        eventType: "GENERAL",
+        emoji: "⏰",
+        preset: "WEEKDAYS",
+        presetLabel: "Mon - Fri",
+        specificDates: [],
+        enabled: true
+      },
+      {
+        id: "2",
+        hour: 8,
+        minute: 30,
+        ampm: "AM",
+        label: "Mom's Birthday Celebration",
+        eventType: "BIRTHDAY",
+        emoji: "🎂",
+        preset: "SPECIFIC_DATES",
+        presetLabel: "Dec 12, 2026",
+        specificDates: ["2026-12-12"],
+        enabled: true
+      },
+      {
+        id: "3",
+        hour: 7,
+        minute: 0,
+        ampm: "PM",
+        label: "Wedding Anniversary Dinner",
+        eventType: "ANNIVERSARY",
+        emoji: "💍",
+        preset: "WHOLE_WEEK",
+        presetLabel: "Whole week",
+        specificDates: [],
+        enabled: false
+      }
+    ];
+
+    function persistAlarms() {
+      localStorage.setItem('omniclock_alarms', JSON.stringify(alarms));
+    }
+
+    // --- State ---
+    let activeTab = 'world';
+    let selectedEventType = "BIRTHDAY";
+    let selectedPreset = "WEEKDAYS";
+    let selectedSpecificDates = new Set();
+    let currentHour = 7;
+    let currentMinute = 30;
+    let currentAmPm = "AM";
+    let audioContext = null;
+
+    // --- Realtime Clock Loop ---
+    function updateClocks() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      
+      document.getElementById('heroLocalTime').innerText = timeStr;
+      document.getElementById('heroLocalDate').innerText = dateStr;
+      document.getElementById('localZoneName').innerText = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      renderCities();
+      checkAlarmTriggers(now);
+    }
+
+    // Check if any alarm should fire right now
+    function checkAlarmTriggers(now) {
+      const curH = now.getHours();
+      const curM = now.getMinutes();
+      const curS = now.getSeconds();
+      if (curS !== 0) return; // check only on the minute start
+
+      const isAm = curH < 12;
+      const h12 = (curH % 12 === 0) ? 12 : (curH % 12);
+      const ampm = isAm ? "AM" : "PM";
+
+      alarms.forEach(a => {
+        if (a.enabled && a.hour === h12 && a.minute === curM && a.ampm === ampm) {
+          triggerAlarmRing(a.label || a.eventType, a.emoji);
+        }
+      });
+    }
+
+    setInterval(updateClocks, 1000);
+    updateClocks();
+
+    // --- Render Cities ---
+    function renderCities(filter = '') {
+      const list = document.getElementById('citiesList');
+      const filtered = CITIES.filter(c => 
+        c.name.toLowerCase().includes(filter.toLowerCase()) || 
+        c.country.toLowerCase().includes(filter.toLowerCase())
+      ).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+
+      list.innerHTML = filtered.map(city => {
+        const now = new Date();
+        const cityTimeStr = now.toLocaleTimeString([], { timeZone: city.tz, hour: '2-digit', minute: '2-digit' });
+        const cityDateStr = now.toLocaleDateString([], { timeZone: city.tz, weekday: 'short', month: 'short', day: 'numeric' });
+        
+        const targetDate = new Date(now.toLocaleString('en-US', { timeZone: city.tz }));
+        const diffHrs = Math.round((targetDate - now) / 3600000);
+        const diffText = diffHrs === 0 ? "Same time" : (diffHrs > 0 ? `+${diffHrs} hrs` : `${diffHrs} hrs`);
+        
+        const cityHour = parseInt(now.toLocaleTimeString('en-US', { timeZone: city.tz, hour12: false, hour: 'numeric' }));
+        const isDay = cityHour >= 6 && cityHour < 18;
+
+        return `
+          <div class="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 hover:border-slate-600 transition flex justify-between items-center">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xl">${city.flag}</span>
+                <span class="text-sm font-bold text-white">${city.name}</span>
+                <button onclick="togglePinCity('${city.id}')" class="text-xs ${city.isPinned ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}">
+                  <i class="fa-solid fa-thumbtack"></i>
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">${city.country} · <span class="text-cyan-400">${diffText}</span></p>
+              <p class="text-[10px] text-slate-500">${cityDateStr}</p>
+            </div>
+            <div class="text-right">
+              <div class="flex items-center justify-end space-x-1.5 text-slate-400 text-xs mb-0.5">
+                <i class="fa-solid ${isDay ? 'fa-sun text-amber-400' : 'fa-moon text-blue-300'} text-[11px]"></i>
+              </div>
+              <span class="text-lg font-bold font-mono text-white">${cityTimeStr}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function togglePinCity(cityId) {
+      const city = CITIES.find(c => c.id === cityId);
+      if (city) {
+        city.isPinned = !city.isPinned;
+        renderCities(document.getElementById('citySearchInput').value);
+      }
+    }
+
+    function filterCities() {
+      const query = document.getElementById('citySearchInput').value;
+      renderCities(query);
+    }
+
+    // --- Tab Navigation ---
+    function switchTab(tab) {
+      activeTab = tab;
+      const worldTab = document.getElementById('worldClockTab');
+      const alarmsTab = document.getElementById('alarmsTab');
+      const tabWorldBtn = document.getElementById('tabWorldBtn');
+      const tabAlarmsBtn = document.getElementById('tabAlarmsBtn');
+
+      if (tab === 'world') {
+        worldTab.classList.remove('hidden');
+        alarmsTab.classList.add('hidden');
+        tabWorldBtn.classList.add('text-cyan-400');
+        tabWorldBtn.classList.remove('text-slate-400');
+        tabAlarmsBtn.classList.remove('text-cyan-400');
+        tabAlarmsBtn.classList.add('text-slate-400');
+      } else {
+        worldTab.classList.add('hidden');
+        alarmsTab.classList.remove('hidden');
+        tabAlarmsBtn.classList.add('text-cyan-400');
+        tabAlarmsBtn.classList.remove('text-slate-400');
+        tabWorldBtn.classList.remove('text-cyan-400');
+        tabWorldBtn.classList.add('text-slate-400');
+        renderAlarms();
+      }
+    }
+
+    // --- Render Alarms ---
+    function renderAlarms() {
+      const list = document.getElementById('alarmsList');
+      const activeCount = alarms.filter(a => a.enabled).length;
+      document.getElementById('alarmCountBadge').innerText = `${activeCount} Active`;
+
+      list.innerHTML = alarms.map(alarm => {
+        return `
+          <div class="p-4 rounded-2xl bg-slate-800/70 border ${alarm.enabled ? 'border-slate-700' : 'border-slate-800 opacity-60'} flex justify-between items-center transition">
+            <div class="flex-1">
+              <div class="flex items-center space-x-1.5">
+                <span class="text-base">${alarm.emoji}</span>
+                <span class="text-xs font-bold ${alarm.enabled ? 'text-slate-200' : 'text-slate-400'}">${alarm.label || alarm.eventType}</span>
+              </div>
+              <div class="text-3xl font-extrabold font-mono ${alarm.enabled ? 'text-cyan-400' : 'text-slate-500'} my-0.5">
+                ${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')} <span class="text-sm font-semibold text-slate-400">${alarm.ampm}</span>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px] text-slate-400">
+                <span>🗓️ ${alarm.presetLabel}</span>
+              </div>
+              <button onclick="triggerAlarmFor('${alarm.id}')" class="text-[10px] text-cyan-400 hover:underline mt-1 font-semibold">
+                🔔 Test Ring
+              </button>
+            </div>
+            <div class="flex flex-col items-end space-y-2">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" ${alarm.enabled ? 'checked' : ''} onchange="toggleAlarm('${alarm.id}')" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+              </label>
+              <button onclick="deleteAlarm('${alarm.id}')" class="text-slate-500 hover:text-rose-400 text-xs p-1">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleAlarm(id) {
+      const a = alarms.find(x => x.id === id);
+      if (a) {
+        a.enabled = !a.enabled;
+        persistAlarms();
+        renderAlarms();
+        showToast(a.enabled ? `Alarm enabled for ${a.hour}:${String(a.minute).padStart(2,'0')} ${a.ampm}` : "Alarm disabled");
+      }
+    }
+
+    function deleteAlarm(id) {
+      alarms = alarms.filter(x => x.id !== id);
+      persistAlarms();
+      renderAlarms();
+      showToast("Alarm removed");
+    }
+
+    // --- Add Alarm Modal Logic ---
+    function openAddAlarmModal() {
+      document.getElementById('addAlarmModal').classList.remove('hidden');
+      renderEventTypeChips();
+      selectPreset('WEEKDAYS');
+      generateNextDaysRow();
+    }
+
+    function closeAddAlarmModal() {
+      document.getElementById('addAlarmModal').classList.add('hidden');
+    }
+
+    function adjustHour(delta) {
+      currentHour += delta;
+      if (currentHour > 12) currentHour = 1;
+      if (currentHour < 1) currentHour = 12;
+      document.getElementById('pickHour').innerText = String(currentHour).padStart(2, '0');
+    }
+
+    function adjustMinute(delta) {
+      currentMinute += delta * 5;
+      if (currentMinute >= 60) currentMinute = 0;
+      if (currentMinute < 0) currentMinute = 55;
+      document.getElementById('pickMinute').innerText = String(currentMinute).padStart(2, '0');
+    }
+
+    function setAmPm(val) {
+      currentAmPm = val;
+      if (val === 'AM') {
+        document.getElementById('ampmAM').className = "text-xs px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-bold";
+        document.getElementById('ampmPM').className = "text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400";
+      } else {
+        document.getElementById('ampmPM').className = "text-xs px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-bold";
+        document.getElementById('ampmAM').className = "text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400";
+      }
+    }
+
+    function renderEventTypeChips() {
+      const container = document.getElementById('eventTypeChips');
+      container.innerHTML = EVENT_TYPES.map(type => {
+        const isSelected = type.id === selectedEventType;
+        return `
+          <button type="button" onclick="selectEventType('${type.id}')" 
+                  class="text-xs px-3 py-1.5 rounded-xl border transition flex items-center space-x-1.5 ${isSelected ? 'border-cyan-400 bg-cyan-950/80 text-cyan-300 font-bold' : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'}">
+            <span>${type.emoji}</span>
+            <span>${type.title}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectEventType(id) {
+      selectedEventType = id;
+      renderEventTypeChips();
+    }
+
+    function selectPreset(preset) {
+      selectedPreset = preset;
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        if (btn.getAttribute('data-preset') === preset) {
+          btn.className = "preset-btn text-xs py-2 px-3 rounded-xl border border-cyan-500 bg-cyan-950/60 text-cyan-300 font-medium";
+        } else {
+          btn.className = "preset-btn text-xs py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/80 font-medium hover:border-cyan-500 transition text-slate-300";
+        }
+      });
+
+      const multiSection = document.getElementById('multiDateSection');
+      if (preset === 'SPECIFIC_DATES') {
+        multiSection.classList.remove('hidden');
+      } else {
+        multiSection.classList.add('hidden');
+      }
+    }
+
+    function generateNextDaysRow() {
+      const row = document.getElementById('multiDateDaysRow');
+      const now = new Date();
+      let html = '';
+      for (let i = 0; i < 14; i++) {
+        const d = new Date();
+        d.setDate(now.getDate() + i);
+        const iso = d.toISOString().split('T')[0];
+        const dayName = d.toLocaleDateString([], { weekday: 'short' });
+        const dayNum = d.getDate();
+        const isSelected = selectedSpecificDates.has(iso);
+
+        html += `
+          <button type="button" onclick="toggleDateSelection('${iso}')" class="flex-shrink-0 px-2.5 py-1.5 rounded-xl border text-center transition ${isSelected ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500'}">
+            <div class="text-[10px] uppercase">${dayName}</div>
+            <div class="text-sm font-bold">${dayNum}</div>
+          </button>
+        `;
+      }
+      row.innerHTML = html;
+      renderSelectedDatePills();
+    }
+
+    function toggleDateSelection(iso) {
+      if (selectedSpecificDates.has(iso)) {
+        selectedSpecificDates.delete(iso);
+      } else {
+        selectedSpecificDates.add(iso);
+      }
+      generateNextDaysRow();
+    }
+
+    function renderSelectedDatePills() {
+      const pillsContainer = document.getElementById('selectedDatePills');
+      document.getElementById('selectedDatesCount').innerText = `${selectedSpecificDates.size} selected`;
+      if (selectedSpecificDates.size === 0) {
+        pillsContainer.innerHTML = '<span class="text-[11px] text-slate-500">Tap dates above to select</span>';
+        return;
+      }
+      pillsContainer.innerHTML = Array.from(selectedSpecificDates).sort().map(iso => {
+        const d = new Date(iso + "T00:00:00");
+        const formatted = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        return `
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center space-x-1">
+            <span>${formatted}</span>
+            <i onclick="toggleDateSelection('${iso}')" class="fa-solid fa-xmark cursor-pointer hover:text-white text-[9px]"></i>
+          </span>
+        `;
+      }).join('');
+    }
+
+    function saveNewAlarm() {
+      const label = document.getElementById('alarmLabelInput').value.trim();
+      const eventObj = EVENT_TYPES.find(x => x.id === selectedEventType) || EVENT_TYPES[0];
+      
+      let presetLabel = "Mon - Fri";
+      if (selectedPreset === 'EVERY_DAY') presetLabel = "Every day";
+      if (selectedPreset === 'WHOLE_WEEK') presetLabel = "Whole week";
+      if (selectedPreset === 'SPECIFIC_DATES') {
+        presetLabel = selectedSpecificDates.size === 1 ? Array.from(selectedSpecificDates)[0] : `${selectedSpecificDates.size} specific dates`;
+      }
+
+      alarms.push({
+        id: String(Date.now()),
+        hour: currentHour,
+        minute: currentMinute,
+        ampm: currentAmPm,
+        label: label,
+        eventType: selectedEventType,
+        emoji: eventObj.emoji,
+        preset: selectedPreset,
+        presetLabel: presetLabel,
+        specificDates: Array.from(selectedSpecificDates),
+        enabled: true
+      });
+
+      persistAlarms();
+      closeAddAlarmModal();
+      switchTab('alarms');
+      showToast(`Alarm set for ${currentHour}:${String(currentMinute).padStart(2,'0')} ${currentAmPm}`);
+    }
+
+    // --- Audio Synthesis & Ring Trigger ---
+    function triggerTestRing() {
+      const first = alarms[0] || { label: "General Reminder", emoji: "⏰" };
+      triggerAlarmRing(first.label || "Alarm Alert", first.emoji || "⏰");
+    }
+
+    function triggerAlarmFor(id) {
+      const alarm = alarms.find(a => a.id === id);
+      if (alarm) {
+        triggerAlarmRing(alarm.label || alarm.eventType, alarm.emoji);
+      }
+    }
+
+    let alarmBeepInterval = null;
+
+    function playChime() {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, audioContext.currentTime + 0.3); // A6
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.35);
+
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.4);
+      } catch(e) {}
+    }
+
+    function triggerAlarmRing(title, emoji) {
+      document.getElementById('ringTitle').innerText = title;
+      document.getElementById('ringEmoji').innerText = emoji;
+      document.getElementById('ringCurrentTime').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('alarmRingOverlay').classList.remove('hidden');
+
+      // Native Web Notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: "Alarm is ringing! Tap to dismiss or snooze.",
+          icon: "./icons/icon-192.svg"
+        });
+      }
+
+      playChime();
+      if (alarmBeepInterval) clearInterval(alarmBeepInterval);
+      alarmBeepInterval = setInterval(playChime, 1200);
+    }
+
+    function stopAlarmAudio() {
+      if (alarmBeepInterval) {
+        clearInterval(alarmBeepInterval);
+        alarmBeepInterval = null;
+      }
+    }
+
+    function performSnooze(minutes) {
+      stopAlarmAudio();
+      document.getElementById('alarmRingOverlay').classList.add('hidden');
+      showToast(`⏰ Snoozed for ${minutes} minutes`);
+
+      // Schedule real timeout for snooze
+      setTimeout(() => {
+        triggerAlarmRing("Snoozed: " + document.getElementById('ringTitle').innerText, document.getElementById('ringEmoji').innerText);
+      }, minutes * 60 * 1000);
+    }
+
+    function dismissAlarm() {
+      stopAlarmAudio();
+      document.getElementById('alarmRingOverlay').classList.add('hidden');
+      showToast("Alarm dismissed");
+    }
+
+    function openCustomSnoozeDialog() {
+      document.getElementById('customSnoozeModal').classList.remove('hidden');
+    }
+
+    function confirmCustomSnooze() {
+      const mins = document.getElementById('customSnoozeSlider').value;
+      document.getElementById('customSnoozeModal').classList.add('hidden');
+      performSnooze(mins);
+    }
+
+    // --- Toast Notification ---
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.remove('-translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-24', 'opacity-0');
+      }, 2800);
+    }
+  </script>
+</body>
+</html>
